@@ -4,12 +4,20 @@ This module implements the creation and management of one GCP project including 
 
 ## IAM Examples
 
+<<<<<<< HEAD
 IAM is managed via several variables that implement different levels of control:
+=======
+IAM is controlled via several variables that implement different levels of control:
+>>>>>>> 045806cf (Improve project module README (#627))
 
 - `group_iam` and `iam` configure authoritative bindings that manage individual roles exclusively, mapping to the [`google_project_iam_binding`](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/google_project_iam#google_project_iam_binding) resource
 - `iam_additive` and `iam_additive_members` configure additive bindings that only manage individual role/member pairs, mapping to the [`google_project_iam_member`](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/google_project_iam#google_project_iam_member) resource
 
+<<<<<<< HEAD
 Be mindful about service identity roles when using authoritative IAM, as you might inadvertently remove a role from a [service identity](https://cloud.google.com/iam/docs/service-accounts#google-managed) or default service account. For example, using `roles/editor` with `iam` or `group_iam` will remove the default permissions for the Cloud Services identity. A simple workaround for these scenarios is described below.
+=======
+Be mindful about the service identity roles when using authoritative IAM, as you might end up inadvertently removing a role from a [service identity](https://cloud.google.com/iam/docs/service-accounts#google-managed) or default service account. For example, using `roles/editor` with `iam` or `group_iam` will remove the default permissions for the Cloud Services identity. A simple workaround for these scenarios is described below.
+>>>>>>> 045806cf (Improve project module README (#627))
 
 ### Authoritative IAM
 
@@ -323,7 +331,7 @@ module "project" {
 
 Most of this module's outputs depend on its resources, to allow Terraform to compute all dependencies required for the project to be correctly configured. This allows you to reference outputs like `project_id` in other modules or resources without having to worry about setting `depends_on` blocks manually.
 
-One non-obvious output is `service_accounts`, which offers a simple way to discover service identities and default service accounts, and guarantees that service identities that require an API call to trigger creation (like GCS or BigQuery) exist before use.
+One non-obvious output is `service_accounts`, which offers simple way to discover service identities and default service accounts, and guarantees that service identities that require an API call to trigger creation (like GCS or BigQuery) exist before use.
 
 ```hcl
 module "project" {
