@@ -29,6 +29,15 @@ locals {
       "roles/datacatalog.tagTemplateViewer",
       "roles/storage.objectViewer",
     ]
+    (local.groups.data-analysts-confidential) = [
+      "roles/bigquery.dataViewer",
+      "roles/bigquery.jobUser",
+      "roles/bigquery.metadataViewer",
+      "roles/bigquery.user",
+      "roles/datacatalog.viewer",
+      "roles/datacatalog.tagTemplateViewer",
+      "roles/storage.objectViewer",
+    ]
   }
   dwh_plg_group_iam = {
     (local.groups.data-engineers) = [

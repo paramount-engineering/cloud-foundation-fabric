@@ -24,6 +24,10 @@ module "common-project" {
     (local.groups.data-analysts) = [
       "roles/datacatalog.viewer",
     ]
+    (local.groups.data-analysts-confidential) = [
+      "roles/datacatalog.viewer",
+      "roles/datacatalog.categoryFineGrainedReader",
+    ]
     (local.groups.data-engineers) = [
       "roles/dlp.reader",
       "roles/dlp.user",
