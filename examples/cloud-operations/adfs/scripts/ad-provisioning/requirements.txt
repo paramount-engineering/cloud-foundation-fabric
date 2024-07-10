@@ -1,3 +1,4 @@
 argparse==1.4.0
 Faker==13.3.2
 click==8.0.4
+zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability
