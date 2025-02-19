@@ -1,39 +1,61 @@
 # FAST deployment clean up
+
 If you want to destroy a previous FAST deployment in your organization, follow these steps.
 
 Destruction must be done in reverse order, from stage 3 to stage 0
 
-## Stage 3 (Project Factory)
-
-```bash
-cd $FAST_PWD/03-project-factory/prod/
-terraform destroy
-```
-
 ## Stage 3 (GKE)
+
 Terraform refuses to delete non-empty GCS buckets and BigQuery datasets, so they need to be removed manually from the state.
 
 ```bash
-cd $FAST_PWD/03-project-factory/prod/
+cd $FAST_PWD/3-gke-multitenant/dev/
 
 # remove BQ dataset manually
-for x in $(terraform state list | grep google_bigquery_dataset); do  
-  terraform state rm "$x"; 
+for x in $(terraform state list | grep google_bigquery_dataset); do
+  terraform state rm "$x";
 done
 
 terraform destroy
 ```
 
+## Stage 3 (Data Platform)
+
+Terraform refuses to delete non-empty GCS buckets and BigQuery datasets, so they need to be removed manually from the state.
+
+```bash
+cd $FAST_PWD/3-data-platform/dev/
+
+# remove GCS buckets and BQ dataset manually. Projects will be destroyed anyway
+for x in $(terraform state list | grep google_storage_bucket.bucket); do
+  terraform state rm "$x";
+done
+
+for x in $(terraform state list | grep google_bigquery_dataset); do
+  terraform state rm "$x";
+done
+
+terraform destroy
+```
+
+## Stage 2 (Project Factory)
+
+```bash
+cd $FAST_PWD/2-project-factory/
+terraform destroy
+```
 
 ## Stage 2 (Security)
+
 ```bash
-cd $FAST_PWD/02-security/
+cd $FAST_PWD/2-security/
 terraform destroy
 ```
 
 ## Stage 2 (Networking)
+
 ```bash
-cd $FAST_PWD/02-networking-XXX/
+cd $FAST_PWD/2-networking-XXX/
 terraform destroy
 ```
 
@@ -43,12 +65,11 @@ A minor glitch can surface running `terraform destroy`, where the service projec
 
 Stage 1 is a little more complicated because of the GCS buckets containing your terraform statefiles. By default, Terraform refuses to delete non-empty buckets, which is good to protect your terraform state, but it makes destruction a bit harder. Use the commands below to remove the GCS buckets from the state and then execute `terraform destroy`
 
-
 ```bash
-cd $FAST_PWD/01-resman/
+cd $FAST_PWD/1-resman/
 
 # remove buckets from state since terraform refuses to delete them
-for x in $(terraform state list | grep google_storage_bucket.bucket); do  
+for x in $(terraform state list | grep google_storage_bucket.bucket); do
   terraform state rm "$x"
 done
 
@@ -62,47 +83,44 @@ terraform destroy
 Just like before, we manually remove several resources (GCS buckets and BQ datasets). Note that `terrafom destroy` will fail. This is expected; just continue with the rest of the steps.
 
 ```bash
-cd $FAST_PWD/00-bootstrap/
+cd $FAST_PWD/0-bootstrap/
+export FAST_BU=$(gcloud config list --format 'value(core.account)')
 
-# remove provider config to execute without SA impersonation
-rm 00-bootstrap-providers.tf
+terraform apply -var bootstrap_user=$FAST_BU
+
+# remove GCS buckets and BQ dataset manually. Projects will be destroyed anyway
+for x in $(terraform state list | grep google_storage_bucket.bucket); do
+  terraform state rm "$x";
+done
+
+for x in $(terraform state list | grep google_bigquery_dataset); do
+  terraform state rm "$x";
+done
+
+## remove the providers file and migrate state
+rm 0-bootstrap-providers.tf
 
 # migrate to local state
 terraform init -migrate-state
-
-# remove GCS buckets and BQ dataset manually
-for x in $(terraform state list | grep google_storage_bucket.bucket); do  
-  terraform state rm "$x"; 
-done
-
-for x in $(terraform state list | grep google_bigquery_dataset); do  
-  terraform state rm "$x"; 
-done
-
 terraform destroy
+
 ```
 
 When the destroy fails, continue with the steps below. Again, make sure your user (the one you are using to execute this step) has the Organization Administrator role, as we will remove the permissions for the organization-admins group
 
 ```bash
 # Add the Organization Admin role to $BU_USER in the GCP Console
-# then execute the command below to grant yourself the permissions needed 
+# then execute the command below to grant yourself the permissions needed
 # to finish the destruction
-export FAST_DESTROY_ROLES="roles/billing.admin roles/logging.admin \
-  roles/iam.organizationRoleAdmin roles/resourcemanager.projectDeleter \
-  roles/resourcemanager.folderAdmin roles/owner"
-
-export FAST_BU=$(gcloud config list --format 'value(core.account)')
-
-# find your org id
-gcloud organizations list --filter display_name:[part of your domain]
+export FAST_DESTROY_ROLES="roles/resourcemanager.projectDeleter \
+  roles/owner roles/resourcemanager.organizationAdmin"
 
 # set your org id
 export FAST_ORG_ID=XXXX
 
 for role in $FAST_DESTROY_ROLES; do
   gcloud organizations add-iam-policy-binding $FAST_ORG_ID \
-    --member user:$FAST_BU --role $role
+    --member user:$FAST_BU --role $role --condition None
 done
 
 terraform destroy
@@ -110,5 +128,6 @@ rm -i terraform.tfstate*
 ```
 
 In case you want to deploy FAST stages again, the make sure to:
-* Modify the [prefix](00-bootstrap/variables.tf) variable to allow the deployment of resources that need unique names (eg, projects).
-* Modify the [custom_roles](00-bootstrap/variables.tf) variable to allow recently deleted custom roles to be created again.
+
+* Modify the [prefix](0-bootstrap/variables.tf) variable to allow the deployment of resources that need unique names (eg, projects).
+* Modify the [custom_roles](0-bootstrap/variables.tf) variable to allow recently deleted custom roles to be created again.

@@ -15,6 +15,11 @@
  * limitations under the License.
  */
 
+output "id" {
+  description = "Fully qualified service id."
+  value       = google_cloud_run_service.service.id
+}
+
 output "service" {
   description = "Cloud Run service."
   value       = google_cloud_run_service.service
@@ -46,5 +51,5 @@ output "service_name" {
 
 output "vpc_connector" {
   description = "VPC connector resource if created."
-  value       = try(google_vpc_access_connector.connector.0.id, null)
+  value       = try(google_vpc_access_connector.connector[0].id, null)
 }
