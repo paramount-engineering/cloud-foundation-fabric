@@ -16,19 +16,23 @@
  */
 
 locals {
-  peer_external_gateway = (
-    var.peer_external_gateway != null
-    ? google_compute_external_vpn_gateway.external_gateway[0].self_link
-    : null
-
-  )
+  md5_keys = {
+    for k, v in random_id.md5_keys
+    : k => v.b64_url
+  }
+  peer_gateways_external = {
+    for k, v in var.peer_gateways : k => v.external if v.external != null
+  }
+  peer_gateways_gcp = {
+    for k, v in var.peer_gateways : k => v.gcp if v.gcp != null
+  }
   router = (
-    var.router_create
+    var.router_config.create
     ? try(google_compute_router.router[0].name, null)
-    : var.router_name
+    : var.router_config.name
   )
   vpn_gateway = (
-    var.vpn_gateway_create
+    var.vpn_gateway_create != null
     ? try(google_compute_ha_vpn_gateway.ha_gateway[0].self_link, null)
     : var.vpn_gateway
   )
@@ -36,139 +40,132 @@ locals {
 }
 
 resource "google_compute_ha_vpn_gateway" "ha_gateway" {
-  provider = google-beta
-  count    = var.vpn_gateway_create ? 1 : 0
-  name     = var.name
-  project  = var.project_id
-  region   = var.region
-  network  = var.network
+  count       = var.vpn_gateway_create != null ? 1 : 0
+  name        = var.name
+  description = var.vpn_gateway_create.description
+  project     = var.project_id
+  region      = var.region
+  network     = var.network
+  stack_type  = var.vpn_gateway_create.ipv6 ? "IPV4_IPV6" : "IPV4_ONLY"
 }
 
 resource "google_compute_external_vpn_gateway" "external_gateway" {
-  provider        = google-beta
-  count           = var.peer_external_gateway != null ? 1 : 0
-  name            = "external-${var.name}"
+  for_each        = local.peer_gateways_external
+  name            = each.value.name != null ? each.value.name : "${var.name}-${each.key}"
   project         = var.project_id
-  redundancy_type = var.peer_external_gateway.redundancy_type
-  description     = "Terraform managed external VPN gateway"
+  redundancy_type = each.value.redundancy_type
+  description     = each.value.description
   dynamic "interface" {
-    for_each = var.peer_external_gateway.interfaces
+    for_each = each.value.interfaces
     content {
-      id         = interface.value.id
-      ip_address = interface.value.ip_address
+      id         = interface.key
+      ip_address = interface.value
     }
   }
 }
 
 resource "google_compute_router" "router" {
-  count   = var.router_create ? 1 : 0
-  name    = var.router_name == "" ? "vpn-${var.name}" : var.router_name
+  count   = var.router_config.create ? 1 : 0
+  name    = coalesce(var.router_config.name, "vpn-${var.name}")
   project = var.project_id
   region  = var.region
   network = var.network
   bgp {
     advertise_mode = (
-      var.router_advertise_config == null
-      ? null
-      : var.router_advertise_config.mode
+      var.router_config.custom_advertise != null
+      ? "CUSTOM"
+      : "DEFAULT"
     )
     advertised_groups = (
-      var.router_advertise_config == null ? null : (
-        var.router_advertise_config.mode != "CUSTOM"
-        ? null
-        : var.router_advertise_config.groups
-      )
+      try(var.router_config.custom_advertise.all_subnets, false)
+      ? ["ALL_SUBNETS"]
+      : []
     )
     dynamic "advertised_ip_ranges" {
-      for_each = (
-        var.router_advertise_config == null ? {} : (
-          var.router_advertise_config.mode != "CUSTOM"
-          ? null
-          : var.router_advertise_config.ip_ranges
-        )
-      )
+      for_each = try(var.router_config.custom_advertise.ip_ranges, {})
       iterator = range
       content {
         range       = range.key
         description = range.value
       }
     }
-    asn = var.router_asn
+    keepalive_interval = try(var.router_config.keepalive, null)
+    asn                = var.router_config.asn
   }
 }
 
 resource "google_compute_router_peer" "bgp_peer" {
-  for_each        = var.tunnels
-  region          = var.region
-  project         = var.project_id
-  name            = "${var.name}-${each.key}"
-  router          = local.router
-  peer_ip_address = each.value.bgp_peer.address
-  peer_asn        = each.value.bgp_peer.asn
-  advertised_route_priority = (
-    each.value.bgp_peer_options == null ? var.route_priority : (
-      each.value.bgp_peer_options.route_priority == null
-      ? var.route_priority
-      : each.value.bgp_peer_options.route_priority
-    )
-  )
+  for_each                  = var.tunnels
+  region                    = var.region
+  project                   = var.project_id
+  name                      = each.value.bgp_peer.name != null ? each.value.bgp_peer.name : "${var.name}-${each.key}"
+  router                    = coalesce(each.value.router, local.router)
+  peer_ip_address           = each.value.bgp_peer.address
+  peer_asn                  = each.value.bgp_peer.asn
+  advertised_route_priority = each.value.bgp_peer.route_priority
   advertise_mode = (
-    each.value.bgp_peer_options == null ? null : each.value.bgp_peer_options.advertise_mode
+    try(each.value.bgp_peer.custom_advertise, null) != null
+    ? "CUSTOM"
+    : "DEFAULT"
   )
-  advertised_groups = (
-    each.value.bgp_peer_options == null ? null : (
-      each.value.bgp_peer_options.advertise_mode != "CUSTOM"
-      ? null
-      : each.value.bgp_peer_options.advertise_groups
-    )
-  )
+  advertised_groups = try(each.value.bgp_peer.custom_advertise.all_subnets, false) ? ["ALL_SUBNETS"] : []
   dynamic "advertised_ip_ranges" {
-    for_each = (
-      each.value.bgp_peer_options == null ? {} : (
-        each.value.bgp_peer_options.advertise_mode != "CUSTOM"
-        ? {}
-        : each.value.bgp_peer_options.advertise_ip_ranges
-      )
-    )
+    for_each = try(each.value.bgp_peer.custom_advertise.ip_ranges, {})
     iterator = range
     content {
       range       = range.key
       description = range.value
     }
   }
-  interface = google_compute_router_interface.router_interface[each.key].name
+  dynamic "md5_authentication_key" {
+    for_each = each.value.bgp_peer.md5_authentication_key != null ? toset([each.value.bgp_peer.md5_authentication_key]) : []
+    content {
+      name = md5_authentication_key.value.name
+      key  = coalesce(md5_authentication_key.value.key, local.md5_keys[each.key])
+    }
+  }
+  enable_ipv6               = try(each.value.bgp_peer.ipv6, null) == null ? false : true
+  interface                 = google_compute_router_interface.router_interface[each.key].name
+  ipv6_nexthop_address      = try(each.value.bgp_peer.ipv6.nexthop_address, null)
+  peer_ipv6_nexthop_address = try(each.value.bgp_peer.ipv6.peer_nexthop_address, null)
 }
 
 resource "google_compute_router_interface" "router_interface" {
-  for_each   = var.tunnels
-  project    = var.project_id
-  region     = var.region
-  name       = "${var.name}-${each.key}"
-  router     = local.router
+  for_each = var.tunnels
+  project  = var.project_id
+  region   = var.region
+  name     = each.value.peer_router_interface_name != null ? each.value.peer_router_interface_name : "${var.name}-${each.key}"
+  router   = local.router
+  # FIXME: can bgp_session_range be null?
   ip_range   = each.value.bgp_session_range == "" ? null : each.value.bgp_session_range
   vpn_tunnel = google_compute_vpn_tunnel.tunnels[each.key].name
 }
 
 resource "google_compute_vpn_tunnel" "tunnels" {
-  provider                        = google-beta
-  for_each                        = var.tunnels
-  project                         = var.project_id
-  region                          = var.region
-  name                            = "${var.name}-${each.key}"
-  router                          = local.router
-  peer_external_gateway           = local.peer_external_gateway
-  peer_external_gateway_interface = each.value.peer_external_gateway_interface
-  peer_gcp_gateway                = var.peer_gcp_gateway
-  vpn_gateway_interface           = each.value.vpn_gateway_interface
-  ike_version                     = each.value.ike_version
-  shared_secret = (
-    each.value.shared_secret == "" || each.value.shared_secret == null
-    ? local.secret
-    : each.value.shared_secret
+  for_each = var.tunnels
+  project  = var.project_id
+  region   = var.region
+  name     = each.value.name != null ? each.value.name : "${var.name}-${each.key}"
+  router   = local.router
+  peer_external_gateway = try(
+    google_compute_external_vpn_gateway.external_gateway[each.value.peer_gateway].id,
+    null
   )
-  vpn_gateway = local.vpn_gateway
+  peer_external_gateway_interface = each.value.peer_external_gateway_interface
+  peer_gcp_gateway = lookup(
+    local.peer_gateways_gcp, each.value.peer_gateway, null
+  )
+  vpn_gateway_interface = each.value.vpn_gateway_interface
+  ike_version           = each.value.ike_version
+  shared_secret         = coalesce(each.value.shared_secret, local.secret)
+  vpn_gateway           = local.vpn_gateway
 }
 
 resource "random_id" "secret" {
   byte_length = 8
+}
+
+resource "random_id" "md5_keys" {
+  for_each    = var.tunnels
+  byte_length = 12
 }

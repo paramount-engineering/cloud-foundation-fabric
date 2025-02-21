@@ -1,5 +1,5 @@
 /**
- * Copyright 2022 Google LLC
+ * Copyright 2025 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,122 +28,67 @@ variable "custom_roles" {
   nullable    = false
 }
 
-variable "firewall_policies" {
-  description = "Hierarchical firewall policy rules created in the organization."
-  type = map(map(object({
-    action                  = string
-    description             = string
-    direction               = string
-    logging                 = bool
-    ports                   = map(list(string))
-    priority                = number
-    ranges                  = list(string)
-    target_resources        = list(string)
-    target_service_accounts = list(string)
-    # preview                 = bool
-  })))
-  default = {}
-}
-
-variable "firewall_policy_association" {
-  description = "The hierarchical firewall policy to associate to this folder. Must be either a key in the `firewall_policies` map or the id of a policy defined somewhere else."
-  type        = map(string)
-  default     = {}
-  nullable    = false
-}
-
-variable "firewall_policy_factory" {
-  description = "Configuration for the firewall policy factory."
+variable "factories_config" {
+  description = "Paths to data files and folders that enable factory functionality."
   type = object({
-    cidr_file   = string
-    policy_name = string
-    rules_file  = string
+    custom_roles                  = optional(string)
+    org_policies                  = optional(string)
+    org_policy_custom_constraints = optional(string)
+    context = optional(object({
+      org_policies = optional(map(map(string)), {})
+    }), {})
+  })
+  nullable = false
+  default  = {}
+}
+
+variable "firewall_policy" {
+  description = "Hierarchical firewall policies to associate to the organization."
+  type = object({
+    name   = string
+    policy = string
   })
   default = null
 }
 
-variable "group_iam" {
-  description = "Authoritative IAM binding for organization groups, in {GROUP_EMAIL => [ROLES]} format. Group emails need to be static. Can be used in combination with the `iam` variable."
-  type        = map(list(string))
-  default     = {}
-  nullable    = false
-}
-
-variable "iam" {
-  description = "IAM bindings, in {ROLE => [MEMBERS]} format."
-  type        = map(list(string))
-  default     = {}
-  nullable    = false
-}
-
-variable "iam_additive" {
-  description = "Non authoritative IAM bindings, in {ROLE => [MEMBERS]} format."
-  type        = map(list(string))
-  default     = {}
-  nullable    = false
-}
-
-variable "iam_additive_members" {
-  description = "IAM additive bindings in {MEMBERS => [ROLE]} format. This might break if members are dynamic values."
-  type        = map(list(string))
-  default     = {}
-  nullable    = false
-}
-
-variable "iam_audit_config" {
-  description = "Service audit logging configuration. Service as key, map of log permission (eg DATA_READ) and excluded members as value for each service."
-  type        = map(map(list(string)))
-  default     = {}
-  nullable    = false
-  # default = {
-  #   allServices = {
-  #     DATA_READ = ["user:me@example.org"]
-  #   }
-  # }
-}
-
-variable "iam_audit_config_authoritative" {
-  description = "IAM Authoritative service audit logging configuration. Service as key, map of log permission (eg DATA_READ) and excluded members as value for each service. Audit config should also be authoritative when using authoritative bindings. Use with caution."
-  type        = map(map(list(string)))
-  default     = null
-  # default = {
-  #   allServices = {
-  #     DATA_READ = ["user:me@example.org"]
-  #   }
-  # }
-}
-
-variable "iam_bindings_authoritative" {
-  description = "IAM authoritative bindings, in {ROLE => [MEMBERS]} format. Roles and members not explicitly listed will be cleared. Bindings should also be authoritative when using authoritative audit config. Use with caution."
-  type        = map(list(string))
-  default     = null
-}
-
-variable "logging_exclusions" {
-  description = "Logging exclusions for this organization in the form {NAME -> FILTER}."
-  type        = map(string)
-  default     = {}
-  nullable    = false
-}
-
-variable "logging_sinks" {
-  description = "Logging sinks to create for this organization."
+variable "org_policies" {
+  description = "Organization policies applied to this organization keyed by policy name."
   type = map(object({
-    destination          = string
-    type                 = string
-    filter               = string
-    include_children     = bool
-    bq_partitioned_table = bool
-    # TODO exclusions also support description and disabled
-    exclusions = map(string)
+    inherit_from_parent = optional(bool) # for list policies only.
+    reset               = optional(bool)
+    rules = optional(list(object({
+      allow = optional(object({
+        all    = optional(bool)
+        values = optional(list(string))
+      }))
+      deny = optional(object({
+        all    = optional(bool)
+        values = optional(list(string))
+      }))
+      enforce = optional(bool) # for boolean policies only.
+      condition = optional(object({
+        description = optional(string)
+        expression  = optional(string)
+        location    = optional(string)
+        title       = optional(string)
+      }), {})
+      parameters = optional(string)
+    })), [])
   }))
-  validation {
-    condition = alltrue([
-      for k, v in(var.logging_sinks == null ? {} : var.logging_sinks) :
-      contains(["bigquery", "logging", "pubsub", "storage"], v.type)
-    ])
-    error_message = "Type must be one of 'bigquery', 'logging', 'pubsub', 'storage'."
-  }
+  default  = {}
+  nullable = false
+}
+
+variable "org_policy_custom_constraints" {
+  description = "Organization policy custom constraints keyed by constraint name."
+  type = map(object({
+    display_name   = optional(string)
+    description    = optional(string)
+    action_type    = string
+    condition      = string
+    method_types   = list(string)
+    resource_types = list(string)
+  }))
   default  = {}
   nullable = false
 }
@@ -155,42 +100,4 @@ variable "organization_id" {
     condition     = can(regex("^organizations/[0-9]+", var.organization_id))
     error_message = "The organization_id must in the form organizations/nnn."
   }
-}
-
-variable "policy_boolean" {
-  description = "Map of boolean org policies and enforcement value, set value to null for policy restore."
-  type        = map(bool)
-  default     = {}
-  nullable    = false
-}
-
-variable "policy_list" {
-  description = "Map of list org policies, status is true for allow, false for deny, null for restore. Values can only be used for allow or deny."
-  type = map(object({
-    inherit_from_parent = bool
-    suggested_value     = string
-    status              = bool
-    values              = list(string)
-  }))
-  default  = {}
-  nullable = false
-}
-
-variable "tag_bindings" {
-  description = "Tag bindings for this organization, in key => tag value id format."
-  type        = map(string)
-  default     = null
-}
-
-variable "tags" {
-  description = "Tags by key name. The `iam` attribute behaves like the similarly named one at module level."
-  type = map(object({
-    description = string
-    iam         = map(list(string))
-    values = map(object({
-      description = string
-      iam         = map(list(string))
-    }))
-  }))
-  default = null
 }

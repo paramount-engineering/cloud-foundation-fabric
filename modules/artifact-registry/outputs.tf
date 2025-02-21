@@ -1,5 +1,5 @@
 /**
- * Copyright 2022 Google LLC
+ * Copyright 2024 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,11 +15,46 @@
  */
 
 output "id" {
-  description = "Repository id."
+  description = "Fully qualified repository id."
   value       = google_artifact_registry_repository.registry.id
+  depends_on = [
+    google_artifact_registry_repository_iam_binding.authoritative,
+    google_artifact_registry_repository_iam_binding.bindings2,
+    google_artifact_registry_repository_iam_member.members,
+  ]
 }
 
 output "name" {
   description = "Repository name."
   value       = google_artifact_registry_repository.registry.name
+  depends_on = [
+    google_artifact_registry_repository_iam_binding.authoritative,
+    google_artifact_registry_repository_iam_binding.bindings2,
+    google_artifact_registry_repository_iam_member.members,
+  ]
+}
+
+output "repository" {
+  description = "Repository object."
+  value       = google_artifact_registry_repository.registry
+  depends_on = [
+    google_artifact_registry_repository_iam_binding.authoritative,
+    google_artifact_registry_repository_iam_binding.bindings2,
+    google_artifact_registry_repository_iam_member.members,
+  ]
+}
+
+output "url" {
+  description = "Repository URL."
+  value = join("/", [
+    "${var.location}-${local.format_string}.pkg.dev",
+    var.project_id,
+    var.name
+  ])
+  depends_on = [
+    google_artifact_registry_repository.registry,
+    google_artifact_registry_repository_iam_binding.authoritative,
+    google_artifact_registry_repository_iam_binding.bindings2,
+    google_artifact_registry_repository_iam_member.members,
+  ]
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright 2022 Google LLC
+ * Copyright 2025 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,24 +15,20 @@
  */
 
 locals {
-  # https://github.com/hashicorp/terraform/issues/22405#issuecomment-591917758
-  key = try(
-    var.generate_key
-    ? google_service_account_key.key["1"]
-    : map("", null)
-  , {})
-  prefix                = var.prefix != null ? "${var.prefix}-" : ""
-  resource_email_static = "${local.prefix}${var.name}@${var.project_id}.iam.gserviceaccount.com"
+  name                  = split("@", var.name)[0]
+  prefix                = var.prefix == null ? "" : "${var.prefix}-"
+  resource_email_static = "${local.prefix}${local.name}@${local.sa_domain}.iam.gserviceaccount.com"
   resource_iam_email = (
     local.service_account != null
     ? "serviceAccount:${local.service_account.email}"
     : local.resource_iam_email_static
   )
   resource_iam_email_static = "serviceAccount:${local.resource_email_static}"
+  service_account_id_static = "projects/${var.project_id}/serviceAccounts/${local.resource_email_static}"
   service_account = (
     var.service_account_create
-    ? try(google_service_account.service_account.0, null)
-    : try(data.google_service_account.service_account.0, null)
+    ? try(google_service_account.service_account[0], null)
+    : try(data.google_service_account.service_account[0], null)
   )
   service_account_credential_templates = {
     for file, _ in local.public_keys_data : file => jsonencode(
@@ -57,26 +53,25 @@ locals {
     : file => filebase64("${path.root}/${var.public_keys_directory}/${file}") }
     : {}
   )
+
+  universe               = try(regex("^([^:]*):[a-z]", var.project_id)[0], "")
+  project_id_no_universe = element(split(":", var.project_id), 1)
+  sa_domain              = join(".", compact([local.project_id_no_universe, local.universe]))
 }
 
 
 data "google_service_account" "service_account" {
   count      = var.service_account_create ? 0 : 1
   project    = var.project_id
-  account_id = "${local.prefix}${var.name}"
+  account_id = "${local.prefix}${local.name}"
 }
 
 resource "google_service_account" "service_account" {
   count        = var.service_account_create ? 1 : 0
   project      = var.project_id
-  account_id   = "${local.prefix}${var.name}"
+  account_id   = "${local.prefix}${local.name}"
   display_name = var.display_name
   description  = var.description
-}
-
-resource "google_service_account_key" "key" {
-  for_each           = var.generate_key ? { 1 = 1 } : {}
-  service_account_id = local.service_account.email
 }
 
 resource "google_service_account_key" "upload_key" {

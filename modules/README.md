@@ -13,14 +13,15 @@ These modules are not necessarily backward compatible. Changes breaking compatib
 These modules are used in the examples included in this repository. If you are using any of those examples in your own Terraform configuration, make sure that you are using the same version for all the modules, and switch module sources to GitHub format using references. The recommended approach to working with Fabric modules is the following:
 
 - Fork the repository and own the fork. This will allow you to:
-    - Evolve the existing modules.
-    - Create your own modules.
-    - Sync from the upstream repository to get all the updates.
- 
+  - Evolve the existing modules.
+  - Create your own modules.
+  - Sync from the upstream repository to get all the updates.
+
 - Use GitHub sources with refs to reference the modules. See an example below:
-    ```
+
+    ```terraform
     module "project" {
-        source              = "github.com/GoogleCloudPlatform/cloud-foundation-fabric//modules/project?ref=v13.0.0"
+        source              = "github.com/GoogleCloudPlatform/cloud-foundation-fabric//modules/project?ref=v35.0.0&depth=1"
         name                = "my-project"
         billing_account     = "123456-123456-123456"
         parent              = "organizations/123456"
@@ -29,67 +30,98 @@ These modules are used in the examples included in this repository. If you are u
 
 ## Foundational modules
 
-- [billing budget](./billing-budget)
-- [folder](./folder)
-- [logging bucket](./logging-bucket)
-- [naming convention](./naming-convention)
-- [organization](./organization)
-- [project](./project)
-- [projects-data-source](./projects-data-source)
-- [service account](./iam-service-account)
-- [organization policy](./organization-policy)
+- [Billing account](./billing-account)
+- [Cloud Identity group](./cloud-identity-group/)
+- [Folder](./folder)
+- [Service accounts](./iam-service-account)
+- [Logging bucket](./logging-bucket)
+- [Organization](./organization)
+- [Project](./project)
+- [Projects (data source)](./projects-data-source)
+
+## Process factories
+
+- [Project factory](./project-factory/)
 
 ## Networking modules
 
-- [address reservation](./net-address)
-- [Cloud DNS](./dns)
-- [Cloud NAT](./net-cloudnat)
+- [Address reservation](./net-address)
 - [Cloud Endpoints](./endpoints)
-- [L4 Internal Load Balancer](./net-ilb)
+- [DNS](./dns)
+- [DNS Response Policy](./dns-response-policy/)
+- [Firewall policy](./net-firewall-policy)
+- [External Application Load Balancer](./net-lb-app-ext/)
+- [External Passthrough Network Load Balancer](./net-lb-ext)
+- [External Regional Application Load Balancer](./net-lb-app-ext-regional/)
+- [Internal Application Load Balancer](./net-lb-app-int)
+- [Cross-region Internal Application Load Balancer](./net-lb-app-int-cross-region)
+- [Internal Passthrough Network Load Balancer](./net-lb-int)
+- [Internal Proxy Network Load Balancer](./net-lb-proxy-int)
+- [NAT](./net-cloudnat)
 - [Service Directory](./service-directory)
 - [VPC](./net-vpc)
 - [VPC firewall](./net-vpc-firewall)
-- [VPC peering](./net-vpc-peering)
-- [VPN static](./net-vpn-static)
 - [VPN dynamic](./net-vpn-dynamic)
-- [HA VPN](./net-vpn-ha)
-- [ ] TODO: xLB modules
+- [VPC peering](./net-vpc-peering)
+- [VPN HA](./net-vpn-ha)
+- [VPN static](./net-vpn-static)
 
 ## Compute/Container
 
-- [COS container](./cloud-config-container/onprem/) (coredns, mysql, onprem, squid)
-- [GKE cluster](./gke-cluster)
-- [GKE nodepool](./gke-nodepool)
-- [GKE hub](./gke-hub)
-- [Managed Instance Group](./compute-mig)
 - [VM/VM group](./compute-vm)
+- [MIG](./compute-mig)
+- [COS container](./cloud-config-container/cos-generic-metadata/) (coredns/mysql/nva/onprem/squid)
+- [GKE autopilot cluster](./gke-cluster-autopilot)
+- [GKE standard cluster](./gke-cluster-standard)
+- [GKE hub](./gke-hub)
+- [GKE nodepool](./gke-nodepool)
+- [GCVE private cloud](./gcve-private-cloud)
 
 ## Data
 
+- [AlloyDB](./alloydb)
+- [Analytics Hub](./analytics-hub)
 - [BigQuery dataset](./bigquery-dataset)
-- [Datafusion](./datafusion)
-- [GCS](./gcs)
-- [Pub/Sub](./pubsub)
 - [Bigtable instance](./bigtable-instance)
+- [Biglake catalog](./biglake-catalog)
 - [Cloud SQL instance](./cloudsql-instance)
 - [Data Catalog Policy Tag](./data-catalog-policy-tag)
+- [Data Catalog Tag](./data-catalog-tag)
+- [Data Catalog Tag Template](./data-catalog-tag-template)
+- [Dataform Repository](./dataform-repository/)
+- [Datafusion](./datafusion)
+- [Dataplex](./dataplex)
+- [Dataplex DataScan](./dataplex-datascan/)
+- [Dataproc](./dataproc)
+- [Firestore](./firestore)
+- [GCS](./gcs)
+- [Looker Core](./looker-core)
+- [Pub/Sub](./pubsub)
+- [Spanner instance](./spanner-instance)
 
 ## Development
 
+- [API Gateway](./api-gateway)
+- [Apigee](./apigee)
 - [Artifact Registry](./artifact-registry)
 - [Container Registry](./container-registry)
-- [Source Repository](./source-repository)
-- [Apigee Organization](./apigee-organization)
-- [Apigee X Instance](./apigee-x-instance)
-- [API Gateway](./api-gateway)
+- [Cloud Source Repository](./source-repository)
+- [Secure Source Manager instance](./secure-source-manager-instance)
+- [Workstation cluster](./workstation-cluster)
 
 ## Security
 
-- [Cloud KMS](./kms)
-- [Secret Manager](./secret-manager)
+- [Binauthz](./binauthz/)
+- [Certificate Authority Service (CAS)](./certificate-authority-service)
+- [KMS](./kms)
+- [SecretManager](./secret-manager)
 - [VPC Service Control](./vpc-sc)
+- [Secure Web Proxy](./net-swp)
+- [Certificate Manager](./certificate-manager)
 
 ## Serverless
 
-- [Cloud Functions](./cloud-function)
+- [Cloud Functions v1](./cloud-function-v1)
+- [Cloud Functions v2](./cloud-function-v2)
 - [Cloud Run](./cloud-run)
+- [Cloud Run v2](./cloud-run-v2)

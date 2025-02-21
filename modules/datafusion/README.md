@@ -8,11 +8,11 @@ This module allows simple management of ['Google Data Fusion'](https://cloud.goo
 
 ```hcl
 module "datafusion" {
-  source          = "./modules/datafusion"
-  name            = "my-datafusion"
-  region          = "europe-west1"
-  project_id      = "my-project"
-  network         = "my-network-name"
+  source     = "./fabric/modules/datafusion"
+  name       = "my-datafusion"
+  region     = "europe-west1"
+  project_id = "my-project"
+  network    = "my-network-name"
   # TODO: remove the following line
   firewall_create = false
 }
@@ -23,7 +23,7 @@ module "datafusion" {
 
 ```hcl
 module "datafusion" {
-  source               = "./modules/datafusion"
+  source               = "./fabric/modules/datafusion"
   name                 = "my-datafusion"
   region               = "europe-west1"
   project_id           = "my-project"
@@ -58,7 +58,7 @@ module "datafusion" {
 
 | name | description | sensitive |
 |---|---|:---:|
-| [id](outputs.tf#L17) | DataFusion instance ID. |  |
+| [id](outputs.tf#L17) | Fully qualified instance id. |  |
 | [ip_allocation](outputs.tf#L22) | IP range reserved for Data Fusion instance in case of a private instance. |  |
 | [resource](outputs.tf#L27) | DataFusion resource. |  |
 | [service_account](outputs.tf#L32) | DataFusion Service Account. |  |
