@@ -15,6 +15,20 @@
  * limitations under the License.
  */
 
+output "id" {
+  description = "Fully qualified service id."
+  value       = google_cloud_run_service.service.id
+}
+
+output "invoke_command" {
+  description = "Command to invoke Cloud Run Service / submit job."
+  value       = <<-EOT
+    curl -H "Authorization: bearer $(gcloud auth print-identity-token)" \
+        ${google_cloud_run_service.service.status[0].url} \
+        -X POST -d 'data'
+  EOT
+}
+
 output "service" {
   description = "Cloud Run service."
   value       = google_cloud_run_service.service
@@ -46,5 +60,5 @@ output "service_name" {
 
 output "vpc_connector" {
   description = "VPC connector resource if created."
-  value       = try(google_vpc_access_connector.connector.0.id, null)
+  value       = try(google_vpc_access_connector.connector[0].id, null)
 }

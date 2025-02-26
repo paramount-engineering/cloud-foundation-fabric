@@ -12,19 +12,19 @@ Fabric FAST was initially conceived to help enterprises quickly set up a GCP org
 
 ### Contracts and stages
 
-FAST uses the concept of stages, which individually perform precise tasks but, taken together, build a functional, ready-to-use GCP organization. More importantly, stages are modeled around the security boundaries that typically appear in mature organizations. This arrangement allows delegating ownership of each stage to the team responsible for the types of resources it manages. For example, as its name suggests, the networking stage sets up all the networking elements and is usually the responsibility of a dedicated networking team within the organization.
+FAST uses the concept of stages, which individually perform precise tasks but taken together build a functional, ready-to-use GCP organization. More importantly, stages are modeled around the security boundaries that typically appear in mature organizations. This arrangement allows delegating ownership of each stage to the team responsible for the types of resources it manages. For example, as its name suggests, the networking stage sets up all the networking elements and is usually the responsibility of a dedicated networking team within the organization.
 
-From the perspective of FAST's overall design, stages also work as contacts or interfaces, defining a set of pre-requisites and inputs required to perform their designed task and generating outputs needed by other stages lower in the chain. The diagram below shows the relationships between stages.
+From the perspective of FAST's overall design, stages also work as contracts or interfaces, defining a set of pre-requisites and inputs required to perform their designed task and generating outputs needed by other stages lower in the chain. The diagram below shows the relationships between stages.
 
 <p align="center">
   <img src="stages.svg" alt="Stages diagram">
 </p>
 
-Please refer to the [stages](./stages/) section for further details on each stage.
+Please refer to the [stages](./stages/) section for further details on each stage. For details on tenant-level stages which introduce a deeper level of autonomy via nested FAST setups rooted in a top-level folder, refer to the [multitenant](#multitenant-organizations) section below.
 
 ### Security-first design
 
-Security was, from the beginning, one of the most critical elements in the design of Fabric FAST. Many of FAST's design decisions aim to build the foundations of a secure organization. In fact, the first two stages deal mainly with the organization-wide security setup.
+Security was, from the beginning, one of the most critical elements in the design of Fabric FAST. Many of FAST's design decisions aim to build the foundations of a secure organization. In fact, the first stage deals mainly with the organization-wide security setup, and the second stage partitions the organization hierarchy and puts guardrails in place for each hierarchy branch.
 
 FAST also aims to minimize the number of permissions granted to principals according to the security-first approach previously mentioned. We achieve this through the meticulous use of groups, service accounts, custom roles, and [Cloud IAM Conditions](https://cloud.google.com/iam/docs/conditions-overview), among other things.
 
@@ -32,11 +32,23 @@ FAST also aims to minimize the number of permissions granted to principals accor
 
 A resource factory consumes a simple representation of a resource (e.g., in YAML) and deploys it (e.g., using Terraform). Used correctly, factories can help decrease the management overhead of large-scale infrastructure deployments. See "[Resource Factories: A descriptive approach to Terraform](https://medium.com/google-cloud/resource-factories-a-descriptive-approach-to-terraform-581b3ebb59c)" for more details and the rationale behind factories.
 
-FAST uses YAML-based factories to deploy subnets and firewall rules and, as its name suggests, in the [project factory](./stages/03-project-factory/) stage.
+FAST uses YAML-based factories to deploy subnets and firewall rules and, as its name suggests, in the [project factory](./stages/2-project-factory/) stage.
 
 ### CI/CD
 
-One of our objectives with FAST is to provide a lightweight reference design for the IaC repositories, and a built-in implementation for running our code in automated pipelines. Our CI/CD approach leverages [Workload Identity Federation](https://cloud.google.com/iam/docs/workload-identity-federation), and provides sample workflow configurations for several major providers. Refer to the [CI/CD section in the bootstrap stage](stages/00-bootstrap/README.md#cicd) for more details.
+One of our objectives with FAST is to provide a lightweight reference design for the IaC repositories, and a built-in implementation for running our code in automated pipelines. Our CI/CD approach leverages [Workload Identity Federation](https://cloud.google.com/iam/docs/workload-identity-federation), and provides sample workflow configurations for several major providers. Refer to the [CI/CD section in the bootstrap stage](./stages/0-bootstrap/README.md#cicd) for more details. We also provide separate [optional small stages](./extras/) to help you configure your CI/CD provider.
+
+<!-- TODO: move CI/CD documentation to its own file -->
+
+### Multitenant organizations
+
+FAST has built-in support for multitenancy implemented in [an add-on stage](./addons/1-resman-tenants/). Tenants can optionally be created with FAST compatibility, allowing them independent use of stages 1+ in their own context.
+
+The following diagram is a high-level overview of stages used with multitenancy.
+
+<p align="center">
+  <img src="tenants-stages.svg" alt="Stages for multitenancy.">
+</p>
 
 ## Implementation
 
@@ -54,12 +66,3 @@ Since we expect users to customize FAST to their specific needs, we strive to ma
 We also recognize that FAST users don't need all of its features. Therefore, you don't need to use our project factory or our GKE implementation if you don't want to. Instead, remove those stages or pieces of code and keep what suits you.
 
 Those familiar with Python will note that FAST follows many of the maxims in the [Zen of Python](https://www.python.org/dev/peps/pep-0020/#id2).
-
-## Roadmap
-
-Besides the features already described, FAST roadmap includes:
-
-- Stage to deploy environment-specific multitenant GKE clusters following Google's best practices
-- Stage to deploy a fully featured data platform
-- Reference implementation to use FAST in CI/CD pipelines (in progress)
-- Static policy enforcement
