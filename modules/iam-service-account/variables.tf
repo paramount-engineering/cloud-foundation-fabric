@@ -26,12 +26,6 @@ variable "display_name" {
   default     = "Terraform-managed."
 }
 
-variable "generate_key" {
-  description = "Generate a key for service account."
-  type        = bool
-  default     = false
-}
-
 variable "iam" {
   description = "IAM bindings on the service account in {ROLE => [MEMBERS]} format."
   type        = map(list(string))
@@ -44,6 +38,36 @@ variable "iam_billing_roles" {
   type        = map(list(string))
   default     = {}
   nullable    = false
+}
+
+variable "iam_bindings" {
+  description = "Authoritative IAM bindings in {KEY => {role = ROLE, members = [], condition = {}}}. Keys are arbitrary."
+  type = map(object({
+    members = list(string)
+    role    = string
+    condition = optional(object({
+      expression  = string
+      title       = string
+      description = optional(string)
+    }))
+  }))
+  nullable = false
+  default  = {}
+}
+
+variable "iam_bindings_additive" {
+  description = "Individual additive IAM bindings on the service account. Keys are arbitrary."
+  type = map(object({
+    member = string
+    role   = string
+    condition = optional(object({
+      expression  = string
+      title       = string
+      description = optional(string)
+    }))
+  }))
+  nullable = false
+  default  = {}
 }
 
 variable "iam_folder_roles" {
@@ -90,6 +114,10 @@ variable "prefix" {
   description = "Prefix applied to service account names."
   type        = string
   default     = null
+  validation {
+    condition     = var.prefix != ""
+    error_message = "Prefix cannot be empty, please use null instead."
+  }
 }
 
 variable "project_id" {

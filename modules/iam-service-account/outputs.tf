@@ -18,7 +18,7 @@ output "email" {
   description = "Service account email."
   value       = local.resource_email_static
   depends_on = [
-    local.service_account
+    local.service_account,
   ]
 }
 
@@ -26,27 +26,24 @@ output "iam_email" {
   description = "IAM-format service account email."
   value       = local.resource_iam_email_static
   depends_on = [
-    local.service_account
+    local.service_account,
   ]
 }
 
 output "id" {
-  description = "Service account id."
-  value       = local.service_account.id
+  description = "Fully qualified service account id."
+  value       = local.service_account_id_static
   depends_on = [
-    local.service_account
+    local.service_account,
   ]
-}
-
-output "key" {
-  description = "Service account key."
-  sensitive   = true
-  value       = local.key
 }
 
 output "name" {
   description = "Service account name."
-  value       = local.service_account.name
+  value       = local.service_account_id_static
+  depends_on = [
+    local.service_account,
+  ]
 }
 
 output "service_account" {

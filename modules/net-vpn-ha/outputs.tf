@@ -24,29 +24,35 @@ output "bgp_peers" {
 
 output "external_gateway" {
   description = "External VPN gateway resource."
-  value = (
-    var.peer_external_gateway != null
-    ? google_compute_external_vpn_gateway.external_gateway[0]
-    : null
-  )
+  value       = one(google_compute_external_vpn_gateway.external_gateway[*])
 }
 
 output "gateway" {
   description = "VPN gateway resource (only if auto-created)."
+  value       = one(google_compute_ha_vpn_gateway.ha_gateway[*])
+}
+
+output "id" {
+  description = "Fully qualified VPN gateway id."
   value = (
-    var.vpn_gateway_create
-    ? google_compute_ha_vpn_gateway.ha_gateway[0]
-    : null
+    "projects/${var.project_id}/regions/${var.region}/vpnGateways/${var.name}"
   )
 }
 
+output "md5_keys" {
+  description = "BGP tunnels MD5 keys."
+  value = {
+    for k, v in var.tunnels :
+    k => try(v.bgp_peer.md5_authentication_key, null) == null ? {} : {
+      key  = coalesce(v.bgp_peer.md5_authentication_key.key, local.md5_keys[k])
+      name = v.bgp_peer.md5_authentication_key.name
+    }
+  }
+}
+
 output "name" {
-  description = "VPN gateway name (only if auto-created). ."
-  value = (
-    var.vpn_gateway_create
-    ? google_compute_ha_vpn_gateway.ha_gateway[0].name
-    : null
-  )
+  description = "VPN gateway name (only if auto-created)."
+  value       = one(google_compute_ha_vpn_gateway.ha_gateway[*].name)
 }
 
 output "random_secret" {
@@ -56,11 +62,7 @@ output "random_secret" {
 
 output "router" {
   description = "Router resource (only if auto-created)."
-  value = (
-    var.router_name == ""
-    ? google_compute_router.router[0]
-    : null
-  )
+  value       = one(google_compute_router.router[*])
 }
 
 output "router_name" {
@@ -71,6 +73,14 @@ output "router_name" {
 output "self_link" {
   description = "HA VPN gateway self link."
   value       = local.vpn_gateway
+}
+
+output "shared_secrets" {
+  description = "IPSEC tunnels shared secrets."
+  value = {
+    for k, v in var.tunnels
+    : k => coalesce(v.shared_secret, local.secret)
+  }
 }
 
 output "tunnel_names" {

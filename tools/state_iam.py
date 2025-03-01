@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2022 Google LLC
+# Copyright 2023 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,12 +27,14 @@ FIELDS = ('authoritative', 'resource_type', 'resource_id', 'role',
 ORG_IDS = {}
 RESOURCE_SORT = {'organization': 0, 'folder': 1, 'project': 2}
 RESOURCE_TYPE_RE = re.compile(r'^google_([^_]+)_iam_([^_]+)$')
+
 Binding = collections.namedtuple('Binding', ' '.join(FIELDS))
+Folder = collections.namedtuple('Folder', 'id name parent_id')
 
 
 def _org_id(resource_id):
   if resource_id not in ORG_IDS:
-    ORG_IDS[resource_id] = f'[org_id #{len(ORG_IDS)}]'
+    ORG_IDS[resource_id] = f'[org-{len(ORG_IDS)}]'
   return ORG_IDS[resource_id]
 
 
@@ -75,10 +77,10 @@ def get_bindings(resources, prefix=None, folders=None):
         # Handle Cloud Services Service Account
         if member_domain == 'cloudservices.gserviceaccount.com':
           member_id = "PROJECT_CLOUD_SERVICES"
-        # Handle Cloud Service Identity Service Acocunt
+        # Handle Cloud Service Identity Service Account
         if re.match("^service-\d{8}", member_id):
           member_id = "SERVICE_IDENTITY_" + member_domain.split(".", 1)[0]
-        # Handle BQ Cloud Service Identity Service Acocunt
+        # Handle BQ Cloud Service Identity Service Account
         if re.match("^bq-\d{8}", member_id):
           member_id = "IDENTITY_" + member_domain.split(".", 1)[0]
           resource_type_output = "Service Identity - " + resource_type
@@ -92,11 +94,20 @@ def get_bindings(resources, prefix=None, folders=None):
 
 def get_folders(resources):
   'Parse resources and return folder id, name tuples.'
+  folders = {}
   for r in resources:
     if r['type'] != 'google_folder':
       continue
     for i in r['instances']:
-      yield i['attributes']['id'], i['attributes']['display_name']
+      folder_id = i['attributes']['id']
+      folders[folder_id] = Folder(folder_id, i['attributes']['display_name'],
+                                  i['attributes']['parent'])
+  for folder_id, folder in folders.items():
+    if folder.parent_id.startswith('folders/') and folder.parent_id in folders:
+      name = f'{folders[folder.parent_id].name}/{folder.name}'
+    else:
+      name = folder.name
+    yield folder_id, name
 
 
 def output_csv(bindings):
@@ -113,7 +124,8 @@ def output_principals(bindings):
   print('# IAM bindings reference')
   print('\nLegend: <code>+</code> additive, <code>•</code> conditional.')
   for resource, resource_groups in resource_grouper:
-    print(f'\n## {resource[0].title()} <i>{resource[1].lower()}</i>\n')
+    resource_type, resource_name = resource
+    print(f'\n## {resource_type.title()} <i>{resource_name.lower()}</i>\n')
     principal_grouper = itertools.groupby(
         resource_groups, key=lambda b: (b.member_type, b.member_id))
     print('| members | roles |')

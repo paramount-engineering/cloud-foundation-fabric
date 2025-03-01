@@ -14,60 +14,27 @@
  * limitations under the License.
  */
 
-###############################################################################
-#                                zone variables                               #
-###############################################################################
-
-variable "client_networks" {
-  description = "List of VPC self links that can see this zone."
-  type        = list(string)
-  default     = []
-}
-
-variable "default_key_specs_key" {
-  description = "DNSSEC default key signing specifications: algorithm, key_length, key_type, kind."
-  type        = any
-  default     = {}
-}
-
-variable "default_key_specs_zone" {
-  description = "DNSSEC default zone signing specifications: algorithm, key_length, key_type, kind."
-  type        = any
-  default     = {}
-}
-
 variable "description" {
   description = "Domain description."
   type        = string
   default     = "Terraform managed."
 }
 
-variable "dnssec_config" {
-  description = "DNSSEC configuration: kind, non_existence, state."
-  type        = any
-  default     = {}
+variable "force_destroy" {
+  description = "Set this to true to delete all records in the zone upon zone destruction."
+  type        = bool
+  default     = null
 }
 
-variable "domain" {
-  description = "Zone domain, must end with a period."
-  type        = string
-}
-
-variable "forwarders" {
-  description = "Map of {IPV4_ADDRESS => FORWARDING_PATH} for 'forwarding' zone types. Path can be 'default', 'private', or null for provider default."
-  type        = map(string)
-  default     = {}
+variable "iam" {
+  description = "IAM bindings in {ROLE => [MEMBERS]} format."
+  type        = map(list(string))
+  default     = null
 }
 
 variable "name" {
   description = "Zone name, must be unique within the project."
   type        = string
-}
-
-variable "peer_network" {
-  description = "Peering network self link, only valid for 'peering' zone types."
-  type        = string
-  default     = null
 }
 
 variable "project_id" {
@@ -78,40 +45,102 @@ variable "project_id" {
 variable "recordsets" {
   description = "Map of DNS recordsets in \"type name\" => {ttl, [records]} format."
   type = map(object({
-    ttl     = number
-    records = list(string)
+    ttl     = optional(number, 300)
+    records = optional(list(string))
+    geo_routing = optional(list(object({
+      location = string
+      records  = optional(list(string))
+      health_checked_targets = optional(list(object({
+        load_balancer_type = string
+        ip_address         = string
+        port               = string
+        ip_protocol        = string
+        network_url        = string
+        project            = string
+        region             = optional(string)
+      })))
+    })))
+    wrr_routing = optional(list(object({
+      weight  = number
+      records = list(string)
+    })))
   }))
-  default = {}
+  default  = {}
+  nullable = false
   validation {
     condition = alltrue([
-      for k, v in var.recordsets == null ? {} : var.recordsets :
+      for k, v in coalesce(var.recordsets, {}) :
       length(split(" ", k)) == 2
     ])
     error_message = "Recordsets must have keys in the format \"type name\"."
   }
-}
-
-variable "service_directory_namespace" {
-  description = "Service directory namespace id (URL), only valid for 'service-directory' zone types."
-  type        = string
-  default     = null
-}
-
-variable "type" {
-  description = "Type of zone to create, valid values are 'public', 'private', 'forwarding', 'peering', 'service-directory'."
-  type        = string
-  default     = "private"
   validation {
-    condition     = contains(["public", "private", "forwarding", "peering", "service-directory"], var.type)
-    error_message = "Zone must be one of 'public', 'private', 'forwarding', 'peering', 'service-directory'."
+    condition = alltrue([
+      for k, v in coalesce(var.recordsets, {}) : (
+        (v.records != null && v.wrr_routing == null && v.geo_routing == null) ||
+        (v.records == null && v.wrr_routing != null && v.geo_routing == null) ||
+        (v.records == null && v.wrr_routing == null && v.geo_routing != null)
+      )
+    ])
+    error_message = "Only one of records, wrr_routing or geo_routing can be defined for each recordset."
+  }
+  validation {
+    condition = alltrue(flatten([
+      for k, v in coalesce(var.recordsets, {}) : [
+        for r in try(v.geo_routing.health_checked_targets, []) : [
+          contains(
+            ["regionalL4ilb", "regionalL7ilb", "globalL7ilb", null],
+            try(r.load_balancer_type, null)
+          )
+        ]
+      ]
+    ]))
+    error_message = "Invalid load balancer type for health checked target."
   }
 }
 
-variable "zone_create" {
-  description = "Create zone. When set to false, uses a data source to reference existing zone."
-  type        = bool
-  default     = true
+variable "zone_config" {
+  description = "DNS zone configuration."
+  type = object({
+    domain = string
+    forwarding = optional(object({
+      forwarders      = optional(map(string))
+      client_networks = list(string)
+    }))
+    peering = optional(object({
+      client_networks = list(string)
+      peer_network    = string
+    }))
+    public = optional(object({
+      dnssec_config = optional(object({
+        non_existence = optional(string, "nsec3")
+        state         = string
+        key_signing_key = optional(object(
+          { algorithm = string, key_length = number }),
+          { algorithm = "rsasha256", key_length = 2048 }
+        )
+        zone_signing_key = optional(object(
+          { algorithm = string, key_length = number }),
+          { algorithm = "rsasha256", key_length = 1024 }
+        )
+      }))
+      enable_logging = optional(bool, false)
+    }))
+    private = optional(object({
+      client_networks             = list(string)
+      service_directory_namespace = optional(string)
+    }))
+  })
+  validation {
+    condition = (
+      (try(var.zone_config.forwarding, null) == null ? 0 : 1) +
+      (try(var.zone_config.peering, null) == null ? 0 : 1) +
+      (try(var.zone_config.public, null) == null ? 0 : 1) +
+      (try(var.zone_config.private, null) == null ? 0 : 1) <= 1
+    )
+    error_message = "Only one type of zone can be configured at a time."
+  }
+  default = null
 }
-
 
 
